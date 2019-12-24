@@ -8,6 +8,8 @@ import numpy as np
 from numpy import linalg
 from scipy import optimize
 
+from util import plot_all
+
 warnings.filterwarnings('ignore')
 
 plt.rcParams['figure.figsize'] = [6, 5]
@@ -197,12 +199,13 @@ def main():
                             options={'gtol': epsilon})
     print("root with L-BFGS method: ", lbfgs_res.x)
     print("# of iterations with L-BFGS method: ", lbfgs_res.nit)
-    plot_lines_lvl(linear, "L-BFGS", points_to_vectors(bfgs_res.allvecs), 3000, 100)
 
     # bhhh algorithm results
     # f = partial(middleware, func=linear)
     # path = bhhh(f)
     # plot_lines_lvl(linear, "bhhh", points_to_vectors(path), 3000, 100)
+
+    plot_all(linear, y, [a, b], bfgs_res.x, lbfgs_res.x, optimal_sr1)
 
 
 if __name__ == '__main__':
