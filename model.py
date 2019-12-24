@@ -1,11 +1,12 @@
 import numpy as np
 import pandas as pd
 import scipy.optimize as sp
-from sklearn.model_selection import train_test_split
-from scipy.optimize import SR1
-from util import plot_cost_history
-from typing import Tuple
 from numpy import linalg
+from typing import Tuple
+
+from sklearn.model_selection import train_test_split
+
+from util import plot_cost_history
 
 # dataset and learning rate are available globally
 lr = 0.01
@@ -21,9 +22,12 @@ x_test = x_test.T
 y_test = y_test.T
 
 stop_condition = lambda previous, current: np.linalg.norm(previous - current) < epsilon
-cost_function = lambda theta: np.mean(-(y_train * np.log(sigmoid(np.dot(theta.T, x_train))) + (1 - y_train) * np.log(
-    1 - sigmoid(np.dot(theta.T, x_train)))))
+# cost_function = lambda point: np.mean(-(y_train * np.log(sigmoid(np.dot(point.T, x_train))) + (1 - y_train) * np.log(
+#     1 - sigmoid(np.dot(point.T, x_train)))))
 jac = lambda point: np.dot(x_train, (sigmoid(np.dot(point.T, x_train)) - y_train).T) / x_train.shape[1]
+
+functional_linear = lambda betta: 0.5 * np.sum(np.array([np.square(y_train - (np.dot(x_train.T, betta) + ))]))
+
 
 
 def main():
@@ -48,7 +52,7 @@ def main():
     #     (100 - np.mean(np.abs(y_prediction - y_test)) * 100), lbfgs_iterations))
 
     optimal_sr1, sr1_iterations = sr1_method()
-    y_prediction = predict(optimal_sr1)
+    y_prediction = predict(np.array([q[0] for q in optimal_sr1]))
     print("Test Accuracy for SR1 method: {:.2f}% with {} iterations".format(
         (100 - np.mean(np.abs(y_prediction - y_test)) * 100), sr1_iterations))
 
@@ -126,7 +130,31 @@ def lbfgs_method():
 
 
 def sr1_method():
-    return None
+    x_k = np.array([j[0] for j in np.random.rand(x_train.shape[0], 1)])  # starting point
+    # x_k = np.random.rand(x_train.shape[0], 1)
+    hessian_inverse = np.eye(x_train.shape[0], dtype=int)  # initial value of hessian is set to Identity matrix
+    iterations = 0
+    # alpha_optimal = 0.001
+    while True:
+        gfk = jac(x_k)
+        p_k = - np.dot(hessian_inverse, gfk)
+        line_search = sp.optimize.line_search(cost_function, jac, x_k, p_k)
+        alpha_optimal = line_search[0]
+        x_kp1 = x_k + alpha_optimal * p_k
+        delta_x = x_kp1 - x_k
+        y_k = jac(x_kp1) - gfk
+        w = delta_x - np.dot(hessian_inverse, y_k)
+        if np.absolute(np.dot(w.T, y_k)) >= 0.001 * np.linalg.norm(w.T) * np.linalg.norm(y_k):
+            r0 = 1.0 / (np.dot(w.T, y_k))
+            hessian_inverse = hessian_inverse + r0 * np.dot(w, w.T)
+        iterations += 1
+        if stop_condition(x_k, x_kp1):
+            break
+        else:
+            # print(np.linalg.norm(x_k - x_kp1))
+            x_k = x_kp1
+    return x_kp1, iterations
+
 
 # TODO: поменять цикл с 5000 итерациями на цикл с точностью 10е-3
 # def simple(y, x):
