@@ -2,6 +2,7 @@ import warnings
 from functools import partial
 from typing import Tuple
 import random
+import math
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -102,34 +103,51 @@ def simple(y, x):
 
 
 def bhhh(func):
-    a = []
-    m = np.array([random.random(), random.random()])  # SUPPOSE_MIN  np.array([1, 1])
-    a.append(m)
+    path = []
+    prev = np.array([np.inf, np.inf])
+    m = np.array([2, 2])  # SUPPOSE_MIN  np.array([1, 1])
+    path.append(m)
     cnt = 0
-    alpha_optimal = 0.01
-    # while cnt <= 5000:
-    while True:
+    while np.linalg.norm(prev - m) > epsilon and cnt <= 5000:
+        prev = m
         r = np.zeros((2, 2))
         e = jacobian(m, func).reshape(2, 1)
         for x1, y1 in zip(x, y):
             j = jacobian(m, simple(y1, x1)).reshape(2, 1)
             r += j.dot(j.T)
-        m = m.reshape(2, 1)
-        # line_search = optimize.optimize.line_search(func, partial(jacobian, func=func), m, r)
-        # alpha_optimal = line_search[0]
-        mp1 = m - alpha_optimal * linalg.inv(r).dot(e)
-        mp1 = mp1.reshape(2)
-        a.append(mp1)
+        optimal = lambda alpha: func(m - alpha * linalg.inv(r).dot(e).reshape(2))
+        alpha, cnt_call = golden_section(optimal)
+        m = m - alpha * linalg.inv(r).dot(e).reshape(2)
+        path.append(m)
         cnt += 1
-        print(np.linalg.norm(mp1 - m))
-        # m = mp1
-        if np.linalg.norm(mp1 - m) < 0.01:
-            break
+    return path, cnt, m
+
+
+def golden_section(func, a=0, b=3):
+    gold = (3 - math.sqrt(5)) / 2
+
+    x1 = gold * (b - a) + a
+    x2 = gold * (a - b) + b
+
+    f1 = func(x1)
+    f2 = func(x2)
+    iters = 0
+    while abs(b - a) >= EPS:
+        iters += 1  # Number of calls is two more than number of iterations
+        if f1 < f2:
+            b = x2
+            x2 = x1
+            f2 = f1
+            x1 = gold * (b - a) + a
+            f1 = func(x1)
         else:
-            m = mp1
-    print(a[-1])
-    print("number of iterations", cnt)
-    return a
+            a = x1
+            x1 = x2
+            f1 = f2
+            x2 = gold * (a - b) + b
+            f2 = func(x2)
+
+    return (b + a) / 2, iters
 
 
 def sr1_method():
@@ -159,7 +177,6 @@ def sr1_method():
         if stop_condition(x_k, x_kp1):
             break
         else:
-            print(np.linalg.norm(x_k - x_kp1))
             x_k = x_kp1
     return x_kp1, iterations, path
 
@@ -184,28 +201,31 @@ def main():
 
     # BFGS results
     bfgs_res = optimize.minimize(error_func,
-                           np.array([random.random(), random.random()]),
-                           jac=current_jac,
-                           method='BFGS',
-                           options={'gtol': epsilon})
+                                 np.array([random.random(), random.random()]),
+                                 jac=current_jac,
+                                 method='BFGS',
+                                 options={'gtol': epsilon, 'return_all': True})
     print("root with BFGS method: ", bfgs_res.x)
     print("# of iterations with BFGS method: ", bfgs_res.nit)
+    plot_lines_lvl(linear, "BFGS", points_to_vectors(bfgs_res.allvecs), 3000, 100)
 
     # L-BFGS results
     lbfgs_res = optimize.minimize(error_func,
-                            np.array([random.random(), random.random()]),
-                            jac=current_jac,
-                            method='L-BFGS-B',
-                            options={'gtol': epsilon})
+                                  np.array([random.random(), random.random()]),
+                                  jac=current_jac,
+                                  method='L-BFGS-B',
+                                  options={'gtol': epsilon})
     print("root with L-BFGS method: ", lbfgs_res.x)
     print("# of iterations with L-BFGS method: ", lbfgs_res.nit)
 
     # bhhh algorithm results
-    # f = partial(middleware, func=linear)
-    # path = bhhh(f)
-    # plot_lines_lvl(linear, "bhhh", points_to_vectors(path), 3000, 100)
+    f = partial(middleware, func=linear)
+    path, cnt, m = bhhh(f)
+    plot_lines_lvl(linear, "bhhh", points_to_vectors(path), 3000, 100)
+    print("root with BHHH method: ", m)
+    print("# of iterations with BHHH method: ", cnt)
 
-    plot_all(linear, y, [a, b], bfgs_res.x, lbfgs_res.x, optimal_sr1)
+    plot_all(linear, y, [a, b], bfgs_res.x, lbfgs_res.x, optimal_sr1, m)
 
 
 if __name__ == '__main__':
